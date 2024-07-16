@@ -93,9 +93,10 @@ class Mock:
 
         This is useful for when you want to reuse a mock object.
 
-        The self._calls contains a list of tuples, each of which represents a
-        call to the mock object. The tuple is in the form: (method_name, args,
-        kwargs).
+        The self._calls is a list of tuples, each of which represents a
+        call to the mock object. Each tuple is in the form:
+
+        (method_name, args, kwargs)
         """
         self._calls = []
 
@@ -207,7 +208,7 @@ class Mock:
                 raise self.side_effect
             elif hasattr(self.side_effect, "__iter__"):
                 return self.side_effect.pop(0)
-        if hasattr(self, "return_value"):
+        elif hasattr(self, "return_value"):
             return self.return_value
         else:
             return Mock()
@@ -242,6 +243,8 @@ class AsyncMock(Mock):
     """
     A simple class for creating asynchronous mock objects. Inspired by (but not
     the same as) Python's own unittest.mock.AsyncMock class.
+
+    TODO: Finish this class.
     """
 
     ...
