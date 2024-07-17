@@ -217,6 +217,8 @@ class Mock:
         """
         Return a callable that records the call.
         """
+        if name.startswith("_"):
+            return super().__getattr__(name)
         if hasattr(self, "return_value"):
             return self.return_value
         else:
@@ -226,9 +228,11 @@ class Mock:
         """
         Set an attribute on the mock object.
         """
+        if name.startswith("_"):
+            super().__setattr__(name, value)
         if hasattr(self, "_spec") and name not in self._spec:
             raise AttributeError(f"{name} is not in the mock's spec.")
-        setattr(self, name, value)
+        super().__setattr__(name, value)
 
     def __delattr__(self, name):
         """
@@ -236,7 +240,7 @@ class Mock:
         """
         if hasattr(self, "_spec") and name not in self._spec:
             raise AttributeError(f"{name} is not in the mock's spec.")
-        delattr(self, name)
+        super().__delattr__(name)
 
 
 class AsyncMock(Mock):
