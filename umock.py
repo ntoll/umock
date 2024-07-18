@@ -78,11 +78,19 @@ class Mock:
                     if not name.startswith("_")
                     and not callable(getattr(spec, name))
                 ]
-                self.__class__ = spec.__class__
+                if type(spec) is not type:
+                    # Set the mock object's class to that of the spec object.
+                    self.__class__ = type(spec)
+            for name in self._spec:
+                # Create a new mock object for each attribute in the spec.
+                setattr(self, name, Mock())
         if return_value:
             self.return_value = return_value
         if side_effect:
-            self.side_effect = side_effect
+            if type(side_effect) in (str, list, tuple, set, dict):
+                self.side_effect = iter(side_effect)
+            else:
+                self.side_effect = side_effect
         self.reset_mock()
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -198,49 +206,47 @@ class Mock:
 
     def __call__(self, *args, **kwargs):
         """
-        Record the call.
+        Record the call and return the specified result.
+
+        In order of precedence, the return value is determined as follows:
+        
+        If a side_effect is specified then that is used to determine the
+        return value. If a return_value is specified then that is used. If
+        neither are specified then the same Mock object is returned each time.
         """
         self._calls.append(("__call__", args, kwargs))
         if hasattr(self, "side_effect"):
-            if callable(self.side_effect):
-                return self.side_effect(*args, **kwargs)
-            elif isinstance(self.side_effect, Exception):
+            if type(self.side_effect) is type and issubclass(
+                self.side_effect, BaseException
+            ):
+                raise self.side_effect()
+            elif isinstance(self.side_effect, BaseException):
                 raise self.side_effect
-            elif hasattr(self.side_effect, "__iter__"):
-                return self.side_effect.pop(0)
-        elif hasattr(self, "return_value"):
-            return self.return_value
+            elif hasattr(self.side_effect, "__next__"):
+                return next(self.side_effect)
+            elif callable(self.side_effect):
+                return self.side_effect(*args, **kwargs)
+            raise TypeError("The mock object has an invalid side_effect.")
+        if hasattr(self, "return_value"):
+            print("YES")
+            #return self.return_value
         else:
             return Mock()
 
     def __getattr__(self, name):
         """
-        Return a callable that records the call.
+        Return an attribute.
         """
         if name.startswith("_"):
             return super().__getattr__(name)
-        if hasattr(self, "return_value"):
-            return self.return_value
+        elif name in self.__dict__:
+            return self.__dict__[name]
+        elif hasattr(self, "_spec") and name not in self._spec:
+            raise AttributeError(f"Mock object has no attribute '{name}'.")
         else:
-            return Mock()
-
-    def __setattr__(self, name, value):
-        """
-        Set an attribute on the mock object.
-        """
-        if name.startswith("_"):
-            super().__setattr__(name, value)
-        if hasattr(self, "_spec") and name not in self._spec:
-            raise AttributeError(f"{name} is not in the mock's spec.")
-        super().__setattr__(name, value)
-
-    def __delattr__(self, name):
-        """
-        Delete an attribute on the mock object.
-        """
-        if hasattr(self, "_spec") and name not in self._spec:
-            raise AttributeError(f"{name} is not in the mock's spec.")
-        super().__delattr__(name)
+            new_mock = Mock()
+            setattr(self, name, new_mock)
+            return new_mock
 
 
 class AsyncMock(Mock):
