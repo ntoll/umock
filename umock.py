@@ -25,11 +25,29 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+#: Attributes of the Mock class that should be handled as "normal" attributes
+#: rather than treated as mocked attributes.
+_RESERVED_MOCK_ATTRIBUTES = ("side_effect", "return_value")
+
 
 class Mock:
     """
     A simple class for creating mock objects. Inspired by (but not the same as)
     Python's own unittest.mock.Mock class.
+
+    Differences between this Mock class and Python's unittest.mock.Mock class:
+
+    * Instantiation of the object only allows use of the spec, side_effect and
+      return_value keyword arguments (no name, spec_set, wraps or unsafe
+      arguments). However, arbitrary keyword arguments can be passed to be set
+      as attributes on the mock object.
+    * Calls are recorded in a list of tuples in the form (args, kwargs) rather
+      than a list of special Call objects.
+    * Mock objects do NOT record nor reveal call information relating to thier
+      child mock objects (i.e. calls are not propagated to parent mocks).
+    * None of the following methods exist in this implementation:
+      mock_add_spec, attach_mock, configure_mock, _get_child_mock,
+      method_calls, mock_calls.
     """
 
     def __init__(
@@ -88,6 +106,7 @@ class Mock:
             self.return_value = return_value
         if side_effect:
             if type(side_effect) in (str, list, tuple, set, dict):
+                # If side_effect is an iterable then make it an iterator.
                 self.side_effect = iter(side_effect)
             else:
                 self.side_effect = side_effect
@@ -122,6 +141,21 @@ class Mock:
         """
         return self.call_count > 0
 
+    @property
+    def call_args(self):
+        """
+        Return the arguments of the last call to the mock object.
+        """
+        if self.call_count:
+            return self._calls[-1]
+
+    @property
+    def call_args_list(self):
+        """
+        Return a list of the arguments of each call to the mock object.
+        """
+        return self._calls
+
     def assert_called(self):
         """
         Assert that the mock object was called at least once.
@@ -139,34 +173,28 @@ class Mock:
         Assert that the mock object was last called in a particular way.
         """
         self.assert_called()
-        assert (
-            self._calls[-1][1] == args
-        ), f"Expected {args}, got {self._calls[-1][1]}."
-        assert (
-            self._calls[-1][2] == kwargs
-        ), f"Expected {kwargs}, got {self._calls[-1][2]}."
+        assert (args, kwargs) == self._calls[
+            -1
+        ], f"Expected {args} and {kwargs}, got {self._calls[-1]}."
 
     def assert_called_once_with(self, *args, **kwargs):
         """
         Assert that the mock object was called once with the given arguments.
         """
         self.assert_called_once()
-        assert (
-            self._calls[0][1] == args
-        ), f"Expected {args}, got {self._calls[0][1]}."
-        assert (
-            self._calls[0][2] == kwargs
-        ), f"Expected {kwargs}, got {self._calls[0][2]}."
+        self.assert_called_with(*args, **kwargs)
 
     def assert_any_call(self, *args, **kwargs):
         """
         Assert that the mock object was called at least once with the given
         arguments.
         """
-        for call in self._calls:
-            if call[1] == args and call[2] == kwargs:
-                return
-        assert False, f"Expected at least one call with {args} and {kwargs}."
+        assert (
+            args,
+            kwargs,
+        ) in self._calls, (
+            f"Expected at least one call with {args} and {kwargs}."
+        )
 
     def assert_has_calls(self, calls, any_order=False):
         """
@@ -179,22 +207,19 @@ class Mock:
         If any_order is true then the calls can be in any order, but they must
         all appear in mock_calls.
         """
-        if not any_order:
-            assert len(self._calls) >= len(
-                calls
-            ), f"Expected at least {len(calls)} calls, got {len(self._calls)}."
-            for i, call in enumerate(calls):
-                assert (
-                    self._calls[i][1] == call[0]
-                ), f"Expected {call[0]}, got {self._calls[i][1]}."
-                assert (
-                    self._calls[i][2] == call[1]
-                ), f"Expected {call[1]}, got {self._calls[i][2]}."
-        else:
+        assert len(calls) <= len(
+            self._calls
+        ), f"Expected {len(calls)} call[s], got {len(self._calls)}."
+        if any_order:
             for call in calls:
                 assert (
                     call in self._calls
                 ), f"Expected {call} in {self._calls}."
+        else:
+            for i, call in enumerate(calls):
+                assert (
+                    self._calls[i] == call
+                ), f"Expected {call} at index {i}, got {self._calls[i]}."
 
     def assert_never_called(self):
         """
@@ -206,15 +231,17 @@ class Mock:
 
     def __call__(self, *args, **kwargs):
         """
-        Record the call and return the specified result.
+        Record the call and return the specified result. Calls to the mock
+        object are recorded in the self._calls list. Each call is a tuple in
+        the form: (method_name, args, kwargs).
 
         In order of precedence, the return value is determined as follows:
-        
+
         If a side_effect is specified then that is used to determine the
         return value. If a return_value is specified then that is used. If
         neither are specified then the same Mock object is returned each time.
         """
-        self._calls.append(("__call__", args, kwargs))
+        self._calls.append((args, kwargs))
         if hasattr(self, "side_effect"):
             if type(self.side_effect) is type and issubclass(
                 self.side_effect, BaseException
@@ -228,16 +255,27 @@ class Mock:
                 return self.side_effect(*args, **kwargs)
             raise TypeError("The mock object has an invalid side_effect.")
         if hasattr(self, "return_value"):
-            print("YES")
-            #return self.return_value
+            return self.return_value
         else:
-            return Mock()
+            # Return a mock object (ensuring it's the same one each time).
+            if hasattr(self, "_mock_value"):
+                return self._mock_value
+            else:
+                new_mock = Mock()
+                self._mock_value = new_mock
+                return new_mock
 
     def __getattr__(self, name):
         """
-        Return an attribute.
+        Retrieve the value of the attribute `name` if it exists in the
+        instance's dictionary. If the attribute does not exist, a new `Mock`
+        object is created, assigned to the attribute, and returned.
+
+        Raises an AttributeError if the attribute does not exist and the
+        instance has a `_spec` attribute that does not contain the attribute
+        name.
         """
-        if name.startswith("_"):
+        if name.startswith("_") or name in _RESERVED_MOCK_ATTRIBUTES:
             return super().__getattr__(name)
         elif name in self.__dict__:
             return self.__dict__[name]
