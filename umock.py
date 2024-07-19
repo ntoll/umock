@@ -365,9 +365,9 @@ def resolve_target(target):
         return target
     if ":" in target:
         # There is a colon - a one-step import is all that's needed.
-        module_name, attribute = target.split(":")
+        module_name, attributes = target.split(":")
         module = __import__(module_name)
-        parts = attribute.split(".")
+        parts = attributes.split(".")
     else:
         # No colon - have to iterate to find the package boundary.
         parts = target.split(".")
@@ -376,7 +376,7 @@ def resolve_target(target):
         module = __import__(module_name)
         while parts:
             # Traverse the parts of the target to find the package boundary.
-            p = parts.pop(0)
+            p = parts[0]]
             new_module_name = f"{module_name}.{p}"
             try:
                 module = __import__(new_module_name)
