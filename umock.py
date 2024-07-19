@@ -315,7 +315,7 @@ class patch:
         If no new object is provided, a new Mock object is created.
         """
         self.target = target
-        self.new = new or Mock()
+        self.new = new
 
     def __call__(self, func, *args, **kwargs):
         """
@@ -332,8 +332,8 @@ class patch:
         """
         Replace the target with new.
         """
-        self.target = resolve_target(self.target)
-        self.new = new
+        self.target = resolve_target(target)
+        self.new = new or Mock()
         self._old = getattr(self.target, self.new.__name__, None)
         setattr(self.target, self.new.__name__, self.new)
         return self.new
@@ -376,7 +376,7 @@ def resolve_target(target):
         module = __import__(module_name)
         while parts:
             # Traverse the parts of the target to find the package boundary.
-            p = parts[0]]
+            p = parts[0]
             new_module_name = f"{module_name}.{p}"
             try:
                 module = __import__(new_module_name)
