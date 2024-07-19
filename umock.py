@@ -121,9 +121,7 @@ class Mock:
         This is useful for when you want to reuse a mock object.
 
         The self._calls is a list of tuples, each of which represents a
-        call to the mock object. Each tuple is in the form:
-
-        (method_name, args, kwargs)
+        call to the mock object. Each tuple is in the form: (args, kwargs)
         """
         self._calls = []
 
@@ -233,7 +231,7 @@ class Mock:
         """
         Record the call and return the specified result. Calls to the mock
         object are recorded in the self._calls list. Each call is a tuple in
-        the form: (method_name, args, kwargs).
+        the form: (args, kwargs).
 
         In order of precedence, the return value is determined as follows:
 
