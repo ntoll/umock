@@ -25,6 +25,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+__all__ = ["Mock", "AsyncMock", "patch"]
+
 #: Attributes of the Mock class that should be handled as "normal" attributes
 #: rather than treated as mocked attributes.
 _RESERVED_MOCK_ATTRIBUTES = ("side_effect", "return_value")
@@ -298,23 +300,40 @@ class AsyncMock(Mock):
 
 class patch:
     """
-    patch() acts as a function decorator, class decorator or a context manager.
-    Inside the body of the function or with statement, the target is patched
-    with a new object. When the function/with statement exits the patch is
-    undone.
+    patch() acts as a function decorator or a context manager. Inside the body
+    of the function or with statement, the target is patched with a new object.
+    When the function/with statement exits the patch is undone.
     """
 
-    def __init__(self, target, new):
+    def __init__(self, target, new=None):
         """
         Create a new patch object that will replace the target with new.
+
+        If the target is a string, it should be in the form
+        "module.submodule.attribute" or "module.submodule:Class.attribute".
+
+        If no new object is provided, a new Mock object is created.
         """
         self.target = target
-        self.new = new
+        self.new = new or Mock()
 
-    def __enter__(self):
+    def __call__(self, func, *args, **kwargs):
+        """
+        Decorate a function with the patch object.
+        """
+
+        def wrapper(*args, **kwargs):
+            with self(self.target, self.new):
+                return func(*args, **kwargs)
+
+        return wrapper
+
+    def __enter__(self, target, new):
         """
         Replace the target with new.
         """
+        self.target = resolve_target(self.target)
+        self.new = new
         self._old = getattr(self.target, self.new.__name__, None)
         setattr(self.target, self.new.__name__, self.new)
         return self.new
@@ -325,3 +344,50 @@ class patch:
         """
         setattr(self.target, self.new.__name__, self._old)
         return False
+
+
+def resolve_target(target):
+    """
+    Return the target object. If the target is a string, search for the module
+    and attribute and return the attribute. Otherwise, return the target as is.
+
+    The target as a string should be in the form "module.submodule.attribute"
+    or "module.submodule:Class.attribute". This function imports the module and
+    returns the attribute.
+
+    "Inspired by" pkgutil.resolve_name in the CPython standard library (but
+    much simpler/naive).
+
+    Will raise an ImportError if the target module cannot be resolved or an
+    AttributeError if the attribute cannot be found.
+    """
+    if not isinstance(target, str):
+        return target
+    if ":" in target:
+        # There is a colon - a one-step import is all that's needed.
+        module_name, attribute = target.split(":")
+        module = __import__(module_name)
+        parts = attribute.split(".")
+    else:
+        # No colon - have to iterate to find the package boundary.
+        parts = target.split(".")
+        module_name = parts.pop(0)
+        # The first part of the target must be a module name.
+        module = __import__(module_name)
+        while parts:
+            # Traverse the parts of the target to find the package boundary.
+            p = parts.pop(0)
+            new_module_name = f"{module_name}.{p}"
+            try:
+                module = __import__(new_module_name)
+                parts.pop(0)
+                module_name = new_module_name
+            except ImportError:
+                break
+    # If we get here, module is the module object we're interested in and
+    # already imported. The parts list contains the remaining parts of the
+    # target to be traversed within the module (or an empty list).
+    result = module
+    for part in parts:
+        result = getattr(result, part)
+    return result
