@@ -2,9 +2,11 @@
 Tests the patch decorator/context manager.
 """
 
+import upytest
 from umock import patch
 
 
+@upytest.skip("upytest does not support patching yet")
 def test_patch_decorator():
     """
     Tests the patch decorator.

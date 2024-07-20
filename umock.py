@@ -358,15 +358,15 @@ def resolve_target(target):
     "Inspired by" pkgutil.resolve_name in the CPython standard library (but
     much simpler/naive).
 
-    Will raise an ImportError if the target module cannot be resolved or an
-    AttributeError if the attribute cannot be found.
+    Will raise an AttributeError if the target object cannot be resolved.
     """
     if not isinstance(target, str):
         return target
     if ":" in target:
         # There is a colon - a one-step import is all that's needed.
         module_name, attributes = target.split(":")
-        module = __import__(module_name)
+        module_path = module_name.replace(".", "/")
+        module = __import__(module_path)
         parts = attributes.split(".")
     else:
         # No colon - have to iterate to find the package boundary.
@@ -377,7 +377,7 @@ def resolve_target(target):
         while parts:
             # Traverse the parts of the target to find the package boundary.
             p = parts[0]
-            new_module_name = f"{module_name}.{p}"
+            new_module_name = f"{module_name}/{p}"
             try:
                 module = __import__(new_module_name)
                 parts.pop(0)
