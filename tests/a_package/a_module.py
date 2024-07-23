@@ -25,4 +25,7 @@ def a_function(a, b):
 
 
 def another_function(a, b):
-    return random.randint(a, b)
+    return a_function(a, b)
+
+
+an_object = AClass(1)

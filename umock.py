@@ -25,6 +25,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import sys
+
 __all__ = ["Mock", "AsyncMock", "patch"]
 
 #: Attributes of the Mock class that should be handled as "normal" attributes
@@ -198,11 +200,9 @@ class Mock:
 
     def assert_has_calls(self, calls, any_order=False):
         """
-        Assert the mock has been called with the specified calls. The mock_
-        calls list is checked for the calls.
+        Assert the mock has been called with the specified calls. 
 
-        If any_order is false then the calls must be sequential. There can be
-        extra calls before or after the specified calls.
+        If any_order is false then the calls must be sequential.
 
         If any_order is true then the calls can be in any order, but they must
         all appear in mock_calls.
@@ -242,7 +242,7 @@ class Mock:
         neither are specified then the same Mock object is returned each time.
         """
         self._calls.append((args, kwargs))
-        if hasattr(self, "side_effect"):
+        if "side_effect" in self.__dict__:
             if type(self.side_effect) is type and issubclass(
                 self.side_effect, BaseException
             ):
@@ -276,10 +276,10 @@ class Mock:
         name.
         """
         if name.startswith("_") or name in _RESERVED_MOCK_ATTRIBUTES:
-            return super().__getattr__(name)
+            return self.__dict__.get(name)
         elif name in self.__dict__:
             return self.__dict__[name]
-        elif hasattr(self, "_spec") and name not in self._spec:
+        elif "_spec" in self.__dict__ and name not in self._spec:
             raise AttributeError(f"Mock object has no attribute '{name}'.")
         else:
             new_mock = Mock()
@@ -305,89 +305,86 @@ class patch:
     When the function/with statement exits the patch is undone.
     """
 
-    def __init__(self, target, new=None):
+    def __init__(self, target, new=None, **kwargs):
         """
         Create a new patch object that will replace the target with new.
 
-        If the target is a string, it should be in the form
-        "module.submodule.attribute" or "module.submodule:Class.attribute".
+        The target should be in the form (note the colon ":"):
 
-        If no new object is provided, a new Mock object is created.
+        "module.submodule:object_name.method_name"
+
+        If no new object is provided, a new Mock object is created with the
+        supplied kwargs.
         """
         self.target = target
         self.new = new
+        self.kwargs = kwargs
 
     def __call__(self, func, *args, **kwargs):
         """
-        Decorate a function with the patch object.
+        Decorate a function with the patch class, and calling the wrapped
+        function with the resulting mock object.
         """
 
         def wrapper(*args, **kwargs):
-            with self(self.target, self.new):
+            with patch(self.target, self.new, **self.kwargs) as new:
+                # Ensure the resulting mock object is passed to the function.
+                args = args + (new,)
                 return func(*args, **kwargs)
 
         return wrapper
 
-    def __enter__(self, target, new):
+    def __enter__(self):
         """
-        Replace the target with new.
+        Replace the target attribute with new.
         """
-        self.target = resolve_target(target)
-        self.new = new or Mock()
-        self._old = getattr(self.target, self.new.__name__, None)
-        setattr(self.target, self.new.__name__, self.new)
+        self.new = self.new or Mock(**self.kwargs)
+        self._old = patch_target(self.target, self.new)
         return self.new
 
     def __exit__(self, exc_type, exc_value, traceback):
         """
-        Restore the target to its original state.
+        Restore the target attribute to its original state.
         """
-        setattr(self.target, self.new.__name__, self._old)
+        patch_target(self.target, self._old)
         return False
 
 
-def resolve_target(target):
+def patch_target(target, replacement):
     """
-    Return the target object. If the target is a string, search for the module
-    and attribute and return the attribute. Otherwise, return the target as is.
+    Patch the referenced target path, with the given replacement. Return
+    the original object that was replaced.
 
-    The target as a string should be in the form "module.submodule.attribute"
-    or "module.submodule:Class.attribute". This function imports the module and
-    returns the attribute.
+    The target should be in the form (note the colon ":"):
 
-    "Inspired by" pkgutil.resolve_name in the CPython standard library (but
-    much simpler/naive).
-
-    Will raise an AttributeError if the target object cannot be resolved.
+    "module.submodule:object_name.method_name"
     """
-    if not isinstance(target, str):
-        return target
-    if ":" in target:
-        # There is a colon - a one-step import is all that's needed.
-        module_name, attributes = target.split(":")
+    if ":" not in target:
+        # No colon in the target, so assume the target is just a module.
+        if target in sys.modules:
+            old_module = sys.modules[target]
+        else:
+            module_path = target.replace(".", "/")
+            old_module = __import__(module_path)
+        sys.modules[target] = replacement
+        return old_module
+    # There IS a colon in the target, so split the target into module and
+    # attribute parts.
+    module_name, attributes = target.split(":")
+    # The target_name is the attribute we eventually want to replace.
+    target_name = attributes.rsplit(".", 1)[-1]
+    # Get the parent module of the target.
+    parent = sys.modules.get(module_name)
+    if not parent:
         module_path = module_name.replace(".", "/")
-        module = __import__(module_path)
-        parts = attributes.split(".")
-    else:
-        # No colon - have to iterate to find the package boundary.
-        parts = target.split(".")
-        module_name = parts.pop(0)
-        # The first part of the target must be a module name.
-        module = __import__(module_name)
-        while parts:
-            # Traverse the parts of the target to find the package boundary.
-            p = parts[0]
-            new_module_name = f"{module_name}/{p}"
-            try:
-                module = __import__(new_module_name)
-                parts.pop(0)
-                module_name = new_module_name
-            except ImportError:
-                break
-    # If we get here, module is the module object we're interested in and
-    # already imported. The parts list contains the remaining parts of the
-    # target to be traversed within the module (or an empty list).
-    result = module
-    for part in parts:
-        result = getattr(result, part)
-    return result
+        parent = __import__(module_path)
+    # Traverse the module path to get the parent object of the target.
+    parts = attributes.split(".")
+    for part in parts[:-1]:
+        parent = getattr(parent, part)
+    # Get the original object that we're going to replace (so we can return
+    # it).
+    old_object = getattr(parent, target_name)
+    # Replace the target attribute with the replacement.
+    setattr(parent, target_name, replacement)
+    return old_object
