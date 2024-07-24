@@ -114,20 +114,20 @@ The resulting mock object has the following properties:
 
 The mock object also has the following methods:
 
-* `reset_mock()`: reset the mock object to a clean state. This is useful for when
-  you want to reuse a mock object.
+* `reset_mock()`: reset the mock object to a clean state. This is useful for
+  when you want to reuse a mock object.
 * `assert_called()`: assert that the mock object was called at least once.
 * `assert_called_once()`: assert that the mock object was called once.
 * `assert_called_with(*args, **kwargs)`: assert that the mock object was last
-  called in a particular way.
+  called with the specified arguments.
 * `assert_called_once_with(*args, **kwargs)`: assert that the mock object was 
   called once with the given arguments.
 * `assert_any_call(*args, **kwargs)`: assert that the mock object was called at 
   least once with the given arguments.
 * `assert_has_calls(calls, any_order=False)`: assert the mock has been called
-  with the specified `calls`. If any_order is `False` then the calls must be 
-  sequential. If any_order is `False`` then the calls can be in any order, but
-  they must all appear in mock_calls.
+  with the specified `calls`. If `any_order` is `False` then the calls must be 
+  sequential. If `any_order` is `True` then the calls can be in any order, but
+  they must all appear in `call_args_list`.
 * `assert_never_called()`: assert that the mock object was never called.
 
 As a result, given a mock object it is possible to call it, have it behave in
@@ -143,6 +143,57 @@ meaning_of_life = m()
 
 assert meaning_of_life == 42, "Meaning of life is not H2G2 compliant."
 m.assert_called_once()
+```
+
+### Asynchronous Mocking
+
+As with the `Mock` class, the `AsyncMock` class provided by uMock allows you to
+create and observe mock objects that, rather than being called, can be
+`await`-ed in Python (for when you're writing asynchronous code).
+
+This class works in almost exactly the same way as the regular `Mock` class,
+but instead of calling it, you `await` it. Furthermore, the properties and
+methods on the `AsyncMock` class are named differently to reflect the
+`await`-able nature of the object.
+
+An `AsyncMock` object has the following properties:
+
+* `await_count`: the number of times the mock object has been awaited.
+* `awaited`: `True` if the mock object was awaited at least once.
+* `await_args`: the arguments of the last await on the mock object.
+* `await_args_list`: a list of the arguments of each await on the mock object.
+
+An asynchronous mock object also has the following methods:
+
+* `reset_mock()`: reset the mock object to a clean state. This is useful for
+  when you want to reuse a mock object.
+* `assert_awaited()`: assert that the mock object was awaited at least once.
+* `assert_awaited_once()`: assert that the mock object was awaited once.
+* `assert_awaited_with(*args, **kwargs)`: assert that the mock object was last
+  awaited with the specified arguments.
+* `assert_awaited_once_with(*args, **kwargs)`: assert that the mock object was
+  awaited once with the given arguments.
+* `assert_any_await(*args, **kwargs)`: assert that the mock object was awaited
+  at least once with the given arguments.
+* `assert_has_awaits(awaits, any_order=False)`: assert the mock has been
+  awaited with the specified awaits. If `any_order` is `False` then the awaits 
+  must be sequential. If `any_order` is `True` then the awaits can be in any 
+  order, but they must all appear in `await_args_list`.
+* `assert_not_awaited()`: assert that the mock object was never awaited.
+
+An `AsyncMock` object can be awaited, respond in a specified manner, and you
+can interrogate it about how it has been used:
+
+```python
+from umock import AsyncMock
+
+
+m = AsyncMock(return_value=42)
+
+meaning_of_life = await m()
+
+assert meaning_of_life == 42, "Meaning of life is not H2G2 compliant."
+m.assert_awaited_once()
 ```
 
 ### Patching

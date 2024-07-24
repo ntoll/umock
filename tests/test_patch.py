@@ -2,7 +2,6 @@
 Tests the patch decorator/context manager.
 """
 
-import upytest
 import sys
 from umock import patch, Mock
 

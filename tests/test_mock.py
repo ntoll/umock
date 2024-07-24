@@ -335,7 +335,7 @@ def test_assert_has_calls():
         )
 
 
-def test_assert_has_call_any_order():
+def test_assert_has_calls_any_order():
     """
     The assert_has_calls method should raise an AssertionError if the mock
     object has not been called with the specified arguments at least once.

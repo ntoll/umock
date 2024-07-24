@@ -27,10 +27,31 @@ def test_patch_target_module():
     from tests.a_package import another_module
 
     assert another_module is mock_module
-    # The original module is returned.
+    # The original module is returned from the patch.
     assert old_module.__name__ == target.replace(".", "/")
     # Restore the old module.
     patch_target(target, old_module)
+
+
+def test_patch_target_sub_module():
+    """
+    The target path is a dotted string with a colon, pointing to a module
+    imported in the referenced module (on the left side of the colon). Ensure
+    this is patched with the expected replacement.
+    """
+    target = "tests.a_package.a_module:random"
+    mock_random = Mock(return_value=42)
+    old_random = patch_target(target, mock_random)
+    # The module is replaced with the mock module.
+    assert sys.modules["tests.a_package.a_module"].random is mock_random
+    # The imported module is also the mock module.
+    from tests.a_package.a_module import random
+
+    assert random is mock_random
+    # The original module is returned from the patch.
+    assert old_random.__name__ == "random"
+    # Restore the old module.
+    patch_target(target, old_random)
 
 
 def test_patch_target_class():
