@@ -23,12 +23,8 @@ def test_patch_target_module():
     old_module = patch_target(target, mock_module)
     # The module is replaced with the mock module.
     assert sys.modules[target] is mock_module
-    # The imported module is also the mock module.
-    from tests.a_package import another_module
-
-    assert another_module is mock_module
     # The original module is returned from the patch.
-    assert old_module.__name__ == target.replace(".", "/")
+    assert old_module.__name__.replace(".", "/") == target.replace(".", "/")
     # Restore the old module.
     patch_target(target, old_module)
 

@@ -30,6 +30,11 @@ import inspect
 
 __all__ = ["Mock", "AsyncMock", "patch"]
 
+
+#: A flag to show if MicroPython is the current Python interpreter.
+is_micropython = "micropython" in sys.version.lower()
+
+
 #: Attributes of the Mock class that should be handled as "normal" attributes
 #: rather than treated as mocked attributes.
 _RESERVED_MOCK_ATTRIBUTES = ("side_effect", "return_value")
@@ -40,7 +45,30 @@ def is_awaitable(obj):
     Returns a boolean indication if the passed in obj is an awaitable
     function. (MicroPython treats awaitables as generator functions.)
     """
-    return inspect.isgeneratorfunction(obj)
+    if is_micropython:
+        return inspect.isgeneratorfunction(obj)
+    return inspect.iscoroutinefunction(obj)
+
+
+def import_module(module_path):
+    """
+    Import the referenced module in a way that works with both MicroPython and
+    Pyodide. The module_path should be a dotted string representing the module
+    to import.
+    """
+    if is_micropython:
+        file_path = module_path.replace(".", "/")
+        module = __import__(file_path)
+        return module
+    else:
+        module_name = module_path.split(".")[-1]
+        module = __import__(
+            module_path,
+            fromlist=[
+                module_name,
+            ],
+        )
+    return module
 
 
 class Mock:
@@ -112,9 +140,6 @@ class Mock:
                         or is_awaitable(getattr(spec, name))  # no awaitables
                     )
                 ]
-                if type(spec) is not type:
-                    # Set the mock object's class to that of the spec object.
-                    self.__class__ = type(spec)
             for name in self._spec:
                 # Create a new mock object for each attribute in the spec.
                 setattr(self, name, Mock())
@@ -372,9 +397,6 @@ class AsyncMock:
                         or is_awaitable(getattr(spec, name))  # no awaitables
                     )
                 ]
-                if type(spec) is not type:
-                    # Set the mock object's class to that of the spec object.
-                    self.__class__ = type(spec)
             for name in self._spec:
                 # Create a new mock object for each attribute in the spec.
                 setattr(self, name, Mock())
@@ -631,8 +653,7 @@ def patch_target(target, replacement):
         if target in sys.modules:
             old_module = sys.modules[target]
         else:
-            module_path = target.replace(".", "/")
-            old_module = __import__(module_path)
+            old_module = import_module(target)
         sys.modules[target] = replacement
         return old_module
     # There IS a colon in the target, so split the target into module and
@@ -643,8 +664,7 @@ def patch_target(target, replacement):
     # Get the parent module of the target.
     parent = sys.modules.get(module_name)
     if not parent:
-        module_path = module_name.replace(".", "/")
-        parent = __import__(module_path)
+        parent = import_module(module_name)
     # Traverse the module path to get the parent object of the target.
     parts = attributes.split(".")
     for part in parts[:-1]:

@@ -42,9 +42,8 @@ def test_init_mock_with_spec_from_list():
 def test_init_mock_with_spec_from_object():
     """
     A Mock object should be created with the specified attributes derived from
-    the referenced instance. The Mock's __class__ should be set to that of the
-    spec object's. Accessing arbitrary attributes not on the class should raise
-    an AttributeError.
+    the referenced instance. Accessing arbitrary attributes not on the object
+    should raise an AttributeError.
 
     If an arbitrary attribute is subqeuently added to the mock object, it
     should be accessible as per normal Python behaviour.
@@ -59,7 +58,7 @@ def test_init_mock_with_spec_from_object():
     assert hasattr(mock, "x"), "Mock object missing 'x' attribute."
     assert hasattr(mock, "y"), "Mock object missing 'y' attribute."
     assert not hasattr(mock, "z"), "Mock object has unexpected 'z' attribute."
-    assert mock.__class__ == TestClass, "Mock object has unexpected class."
+    assert mock.__class__ == Mock, "Mock object has unexpected class."
     mock.z = "test"
     assert mock.z == "test", "Mock object attribute 'z' not set correctly."
 
@@ -67,9 +66,8 @@ def test_init_mock_with_spec_from_object():
 def test_init_mock_with_spec_from_class():
     """
     A Mock object should be created with the specified attributes derived from
-    the referenced class. Since this is a class spec, the Mock's __class__
-    remains as Mock. Accessing arbitrary attributes not on the class should
-    raise an AttributeError.
+    the referenced class. Accessing arbitrary attributes not on the class
+    should raise an AttributeError.
 
     If an arbitrary attribute is subqeuently added to the mock object, it
     should be accessible as per normal Python behaviour.
@@ -128,7 +126,7 @@ def test_init_mock_with_exception_instance_side_effect():
     with upytest.raises(ValueError) as expected:
         mock()
     assert (
-        str(expected.exception.value) == "test"
+        str(expected.exception) == "test"
     ), "Exception message not as expected."
 
 

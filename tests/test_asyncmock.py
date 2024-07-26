@@ -3,8 +3,13 @@ Tests to ensure that the AsyncMock class works as expected (close to, but not
 exacty the same as unittest.mock.AsyncMock).
 """
 
+import sys
 import upytest
 from umock import AsyncMock
+
+
+#: A flag to show if MicroPython is the current Python interpreter.
+is_micropython = "micropython" in sys.version.lower()
 
 
 def test_init_async_mock():
@@ -46,9 +51,8 @@ def test_init_async_mock_with_spec_from_list():
 def test_init_async_mock_with_spec_from_object():
     """
     An AsyncMock object should be created with the specified attributes derived
-    from the referenced instance. The AsyncMock's __class__ should be set to
-    that of the spec object's. Accessing arbitrary attributes not on the class
-    should raise an AttributeError.
+    from the referenced instance. Accessing arbitrary attributes not on the
+    object should raise an AttributeError.
 
     If an arbitrary attribute is subqeuently added to the mock object, it
     should be accessible as per normal Python behaviour.
@@ -66,7 +70,7 @@ def test_init_async_mock_with_spec_from_object():
         mock, "z"
     ), "AsyncMock object has unexpected 'z' attribute."
     assert (
-        mock.__class__ == TestClass
+        mock.__class__ == AsyncMock
     ), "AsyncMock object has unexpected class."
     mock.z = "test"
     assert (
@@ -144,7 +148,7 @@ async def test_init_async_mock_with_exception_instance_side_effect():
     with upytest.raises(ValueError) as expected:
         await mock()
     assert (
-        str(expected.exception.value) == "test"
+        str(expected.exception) == "test"
     ), "Exception message not as expected."
 
 
@@ -161,7 +165,10 @@ async def test_init_async_mock_with_iterable_side_effect():
     assert await mock() == 3, "Third call did not return 3."
     with upytest.raises(RuntimeError) as expected:
         await mock()
-    assert expected.exception.value == "generator raised StopIteration"
+    if is_micropython:
+        assert str(expected.exception) == "generator raised StopIteration"
+    else:
+        assert str(expected.exception) == "coroutine raised StopIteration"
 
 
 async def test_init_async_mock_with_invalid_side_effect():
