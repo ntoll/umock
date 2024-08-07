@@ -89,7 +89,10 @@ def test_patch_target_function():
     patch_target(target, old_function)
 
 
-@upytest.skip("This doesn't seem to work. Check with Damien.")
+@upytest.skip(
+    "This doesn't work because of a MicroPython bug. Damien to fix.",
+    when=upytest.is_micropython,
+)
 def test_patch_target_class_method():
     """
     The target path is a dotted string with a colon, pointing to a method in a

@@ -314,12 +314,16 @@ class Mock:
         name.
         """
         if name.startswith("_") or name in _RESERVED_MOCK_ATTRIBUTES:
+            # Special attributes are handled as normal attributes.
             return self.__dict__.get(name)
         elif name in self.__dict__:
+            # Existing attributes are returned as is.
             return self.__dict__[name]
         elif "_spec" in self.__dict__ and name not in self._spec:
+            # If the attribute is not in the spec then raise an AttributeError.
             raise AttributeError(f"Mock object has no attribute '{name}'.")
         else:
+            # Otherwise, create a new mock object for the attribute.
             new_mock = Mock()
             setattr(self, name, new_mock)
             return new_mock
@@ -574,14 +578,18 @@ class AsyncMock:
         name.
         """
         if name.startswith("_") or name in _RESERVED_MOCK_ATTRIBUTES:
+            # Special attributes are handled as normal attributes.
             return self.__dict__.get(name)
         elif name in self.__dict__:
+            # Existing attributes are returned as is.
             return self.__dict__[name]
         elif "_spec" in self.__dict__ and name not in self._spec:
+            # If the attribute is not in the spec then raise an AttributeError.
             raise AttributeError(
                 f"AsyncMock object has no attribute '{name}'."
             )
         else:
+            # Otherwise, create a new mock object for the attribute.
             new_mock = AsyncMock()
             setattr(self, name, new_mock)
             return new_mock
@@ -625,7 +633,10 @@ class patch:
 
     def __enter__(self):
         """
-        Replace the target attribute with new.
+        Replace the target attribute with self.new.
+
+        If self.new is None, a new Mock object is created with the supplied
+        kwargs and bound to self.new before the target is replaced.
         """
         self.new = self.new or Mock(**self.kwargs)
         self._old = patch_target(self.target, self.new)
@@ -669,9 +680,9 @@ def patch_target(target, replacement):
     parts = attributes.split(".")
     for part in parts[:-1]:
         parent = getattr(parent, part)
-    # Get the original object that we're going to replace (so we can return
-    # it).
+    # Get the original target object that we're going to replace (so we can
+    # return it).
     old_object = getattr(parent, target_name)
-    # Replace the target attribute with the replacement.
+    # Replace the target with the replacement.
     setattr(parent, target_name, replacement)
     return old_object
