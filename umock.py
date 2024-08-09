@@ -35,9 +35,21 @@ __all__ = ["Mock", "AsyncMock", "patch"]
 is_micropython = "micropython" in sys.version.lower()
 
 
-#: Attributes of the Mock class that should be handled as "normal" attributes
-#: rather than treated as mocked attributes.
-_RESERVED_MOCK_ATTRIBUTES = ("side_effect", "return_value")
+#: Attributes of the Mock/AsyncMock classes that should be handled as "normal"
+#: attributes rather than treated as mocked attributes.
+_RESERVED_ATTRIBUTES = ("side_effect", "return_value")
+_RESERVED_MOCK_ATTRIBUTES = _RESERVED_ATTRIBUTES + (
+    "call_count",
+    "called",
+    "call_args",
+    "call_args_list",
+)
+_RESERVED_ASYNCMOCK_ATTRIBUTES = _RESERVED_ATTRIBUTES + (
+    "await_count",
+    "awaited",
+    "await_args",
+    "await_args_list",
+)
 
 
 def is_awaitable(obj):
@@ -151,6 +163,9 @@ class Mock:
                 self.side_effect = iter(side_effect)
             else:
                 self.side_effect = side_effect
+        # The _mock_value is used to ensure the same mock object is returned if
+        # no return_value or side_effect is specified.
+        self._mock_value = None
         self.reset_mock()
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -296,12 +311,9 @@ class Mock:
             return self.return_value
         else:
             # Return a mock object (ensuring it's the same one each time).
-            if hasattr(self, "_mock_value"):
-                return self._mock_value
-            else:
-                new_mock = Mock()
-                self._mock_value = new_mock
-                return new_mock
+            if not self._mock_value:
+                self._mock_value = Mock()
+            return self._mock_value
 
     def __getattr__(self, name):
         """
@@ -412,6 +424,9 @@ class AsyncMock:
                 self.side_effect = iter(side_effect)
             else:
                 self.side_effect = side_effect
+        # The _mock_value is used to ensure the same mock object is returned if
+        # no return_value or side_effect is specified.
+        self._mock_value = None
         self.reset_mock()
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -560,12 +575,9 @@ class AsyncMock:
             return self.return_value
         else:
             # Return a mock object (ensuring it's the same one each time).
-            if hasattr(self, "_mock_value"):
-                return self._mock_value
-            else:
-                new_mock = AsyncMock()
-                self._mock_value = new_mock
-                return new_mock
+            if not self._mock_value:
+                self._mock_value = AsyncMock()
+            return self._mock_value
 
     def __getattr__(self, name):
         """
@@ -577,7 +589,7 @@ class AsyncMock:
         instance has a `_spec` attribute that does not contain the attribute
         name.
         """
-        if name.startswith("_") or name in _RESERVED_MOCK_ATTRIBUTES:
+        if name.startswith("_") or name in _RESERVED_ASYNCMOCK_ATTRIBUTES:
             # Special attributes are handled as normal attributes.
             return self.__dict__.get(name)
         elif name in self.__dict__:
@@ -589,7 +601,7 @@ class AsyncMock:
                 f"AsyncMock object has no attribute '{name}'."
             )
         else:
-            # Otherwise, create a new mock object for the attribute.
+            # Otherwise, create a new async mock object for the attribute.
             new_mock = AsyncMock()
             setattr(self, name, new_mock)
             return new_mock
