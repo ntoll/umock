@@ -382,7 +382,7 @@ def assert_call_returns_same_unique_mock():
     assert id(m()) == id(mock_result), "Returned mock object is not the same."
 
 
-def test_get_attribute_of_unknown_attribute_returns_mock():
+def test_get_attr_of_unknown_attribute_returns_mock():
     """
     Accessing an unknown attribute on the mock object should return another
     mock object. Each attribute access should return the same unique mock.
@@ -390,3 +390,5 @@ def test_get_attribute_of_unknown_attribute_returns_mock():
     m = Mock()
     assert isinstance(m.foo, Mock), "Returned object is not a Mock."
     assert id(m.foo) == id(m.foo), "Returned object is not the same."
+    assert m.foo() is m.foo(), "Returned object is not the same."
+    assert isinstance(m.foo(), Mock), "Returned object is not a Mock."

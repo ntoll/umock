@@ -419,3 +419,5 @@ async def test_get_attribute_of_unknown_attribute_returns_mock():
     m = AsyncMock()
     assert isinstance(m.foo, AsyncMock), "Returned object is not an AsyncMock."
     assert id(m.foo) == id(m.foo), "Returned object is not the same."
+    assert await m.foo() is await m.foo(), "Returned object is not the same."
+    assert isinstance(await m.foo(), AsyncMock), "Returned object is not a Mock."

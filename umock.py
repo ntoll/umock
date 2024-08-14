@@ -162,17 +162,16 @@ class Mock:
             for name in self._spec:
                 # Create a new mock object for each attribute in the spec.
                 setattr(self, name, Mock())
-        if return_value:
-            self.return_value = return_value
+        self.return_value = return_value
         if side_effect:
             if type(side_effect) in (str, list, tuple, set, dict):
                 # If side_effect is an iterable then make it an iterator.
                 self.side_effect = iter(side_effect)
             else:
                 self.side_effect = side_effect
-        # The _mock_value is used to ensure the same mock object is returned if
-        # no return_value or side_effect is specified.
-        self._mock_value = None
+        # The return_value is used to ensure the same result is always returned
+        # when calling the mock object and if no side_effect is specified.
+        self.return_value = return_value
         self.reset_mock()
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -314,13 +313,11 @@ class Mock:
             elif callable(self.side_effect):
                 return self.side_effect(*args, **kwargs)
             raise TypeError("The mock object has an invalid side_effect.")
-        if hasattr(self, "return_value"):
-            return self.return_value
-        else:
-            # Return a mock object (ensuring it's the same one each time).
-            if not self._mock_value:
-                self._mock_value = Mock()
-            return self._mock_value
+        # Return the return_value or a mock object (ensuring it's the same one
+        # each time).
+        if self.return_value is None:
+            self.return_value = Mock()
+        return self.return_value
 
     def __getattr__(self, name):
         """
@@ -423,17 +420,16 @@ class AsyncMock:
             for name in self._spec:
                 # Create a new mock object for each attribute in the spec.
                 setattr(self, name, Mock())
-        if return_value:
-            self.return_value = return_value
+        
         if side_effect:
             if type(side_effect) in (str, list, tuple, set, dict):
                 # If side_effect is an iterable then make it an iterator.
                 self.side_effect = iter(side_effect)
             else:
                 self.side_effect = side_effect
-        # The _mock_value is used to ensure the same mock object is returned if
-        # no return_value or side_effect is specified.
-        self._mock_value = None
+        # The return_value is used to ensure the same result is always returned
+        # when calling the mock object and if no side_effect is specified.
+        self.return_value = return_value
         self.reset_mock()
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -578,13 +574,11 @@ class AsyncMock:
             elif callable(self.side_effect):
                 return self.side_effect(*args, **kwargs)
             raise TypeError("The mock object has an invalid side_effect.")
-        if hasattr(self, "return_value"):
-            return self.return_value
-        else:
-            # Return a mock object (ensuring it's the same one each time).
-            if not self._mock_value:
-                self._mock_value = AsyncMock()
-            return self._mock_value
+        # Return the return_value or a mock object (ensuring it's the same one
+        # each time).
+        if self.return_value is None:
+            self.return_value = AsyncMock()
+        return self.return_value
 
     def __getattr__(self, name):
         """
