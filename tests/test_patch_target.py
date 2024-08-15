@@ -91,7 +91,7 @@ def test_patch_target_function():
 
 @upytest.skip(
     "This doesn't work because of a MicroPython bug. Damien to fix.",
-    when=upytest.is_micropython,
+    skip_when=upytest.is_micropython,
 )
 def test_patch_target_class_method():
     """
