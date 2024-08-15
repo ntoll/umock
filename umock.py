@@ -420,7 +420,7 @@ class AsyncMock:
             for name in self._spec:
                 # Create a new mock object for each attribute in the spec.
                 setattr(self, name, Mock())
-        
+
         if side_effect:
             if type(side_effect) in (str, list, tuple, set, dict):
                 # If side_effect is an iterable then make it an iterator.
