@@ -651,7 +651,8 @@ class patch:
         If self.new is None, a new Mock object is created with the supplied
         kwargs and bound to self.new before the target is replaced.
         """
-        self.new = self.new or Mock(**self.kwargs)
+        if self.new is None:
+            self.new = Mock(**self.kwargs)
         self._old = patch_target(self.target, self.new)
         return self.new
 
